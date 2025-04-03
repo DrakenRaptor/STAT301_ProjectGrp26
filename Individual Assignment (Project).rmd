@@ -1,0 +1,196 @@
+---
+title: An R Markdown document converted from "Individual Assignment (Project).ipynb"
+output: html_document
+---
+
+## STAT301 2024W2 Group 26 Project 
+## Student Number: 23540214
+### Loading of Libraries & Dataset
+
+```{r}
+suppressPackageStartupMessages({
+library(haven)    # Loading of .dta, .csv etc. datasets
+library(tidyverse)
+library(dplyr)
+library(datasets)
+library(car)
+install.packages("vtable")    # maybe needed if not installed
+# install.packages("corrplot")  # maybe needed if not installed
+# install.packages("sandwich")  # maybe needed if not installed
+# install.packages("lmtest")    # maybe needed if not installed
+library(vtable)
+library(corrplot)
+library(sandwich)
+library(lmtest)
+library(repr)
+library(tidymodels)
+install.packages("stargazer")      # maybe needed if not installed
+library(stargazer)
+library(modelr)
+library(broom)
+library(infer)
+library(GGally)
+install.packages("coefplot")      # maybe needed if not installed
+library(coefplot)
+})
+```
+
+```{r}
+# Read the CSV file with specified column types 
+market_data <- as_factor(read_delim("https://raw.githubusercontent.com/DrakenRaptor/STAT301_ProjectGrp26/refs/heads/main/marketing_campaign.csv", delim = "\t"))
+
+# Check the structure of data types 
+str(market_data)
+
+head(market_data)
+str(market_data$Dt_Customer)
+```
+
+## Introduction & Data Description
+
+The assigned dataset for the project is the Customer Personality Analysis found on In this project, the code below show the descriptive summary of the dataset.
+
+### Data Description
+
+This dataset consists of marketing campaign data for a company, with 2,240 observations and 28 variables. The data captures various attributes about customers, including demographic information, purchase history, and responses to marketing campaigns and purchase history.
+
+| **Variable Name**       | **Type**     | **Description**                                               |
+|-------------------------|--------------|---------------------------------------------------------------|
+| `ID`                    | Count Data   | Unique identifier for each customer                           |
+| `Year_Birth`            | Count Data   | Year of birth of the customer                                 |
+| `Education`             | Factor       | Education level of the customer                               |
+| `Marital_Status`        | Factor       | Marital status of the customer                                |
+| `Income`                | Numeric      | Annual income of the customer                                 |
+| `Kidhome`               | Count Data   | Number of children in the customer's household                |
+| `Teenhome`              | Count        | Number of teenagers in the customer's household               |
+| `Dt_Customer`           | Date\*       | Date of enrollment with the company                           |
+| `Recency`               | Count Data   | Days since the last purchase                                  |
+| `MntWines`              | Count Data   | Amount spent on wine                                          |
+| `MntFruits`             | Count Data   | Amount spent on fruits                                        |
+| `MntMeatProducts`       | Count Data   | Amount spent on meat products                                 |
+| `MntFishProducts`       | Count Data   | Amount spent on fish products                                 |
+| `MntSweetProducts`      | Count Data   | Amount spent on sweet products                                |
+| `MntGoldProds`          | Count Data   | Amount spent on gold products                                 |
+| `NumDealsPurchases`     | Count Data   | Number of purchases made with a discount                      |
+| `NumWebPurchases`       | Count Data   | Number of purchases made through the web                      |
+| `NumCatalogPurchases`   | Count Data   | Number of purchases made using a catalog                      |
+| `NumStorePurchases`     | Count Data   | Number of purchases made directly in stores                   |
+| `NumWebVisitsMonth`     | Count Data   | Number of visits to the company's website in the last month   |
+| `AcceptedCmp3`          | Binary       | 1 if the customer accepted the 3rd campaign, 0 otherwise      |
+| `AcceptedCmp4`          | Binary       | 1 if the customer accepted the 4th campaign, 0 otherwise      |
+| `AcceptedCmp5`          | Binary       | 1 if the customer accepted the 5th campaign, 0 otherwise      |
+| `AcceptedCmp1`          | Binary       | 1 if the customer accepted the 1st campaign, 0 otherwise      |
+| `AcceptedCmp2`          | Binary       | 1 if the customer accepted the last campaign, 0 otherwise     |
+| `Complain`              | Binary       | 1 if the customer has complained in the last 2 years, 0 otherwise |
+| `Country`               | Factor       | Country of the customer                                       |
+
+
+*Given that Dt_Customer can be manipulated within the tidyverse library in*
+```r 
+library(lubridate)
+```
+*Hence, I have classified it as a `Date` type in the Data Type.*
+
+**Data Source**: The dataset was collected as part of a marketing campaign analysis by Dr. Omar Romero-Hernandez. https://www.kaggle.com/datasets/imakash3011/customer-personality-analysis/data
+
+## Research Question (Question of Interest)
+
+Customer Personality Analysis is essential to help a firm to modify its product to meet the needs of customers from different segments. In this project, I wish to predict the number of purchases spent made on the web `NumWebPurchases` among customers against the different covariates or predictors such as customer's `Income`, level of education, `NumStorePurchases` , `NumCatalogPurchases`, `NumWebVisitsMonth`, `MntGoldProducts`.
+
+
+
+**<br> Legend:**
+- `NumWebPurchases` is the response variable, representing the number of web purchases made through the company's website.
+- `Income` is a covariate that indicates the annual earnings of the customer.
+- `NumStorePurchases` is a covariate representing the number of purchases made in physical stores.
+- `NumCatalogPurchases` is a covariate representing the number of purchases made using a catalog.
+- `NumWebVisitsMonth` is a covariate representing the number of visits to the company's website in the last month.
+- `MntGoldProds` is a covariate representing the amount spent on gold products.
+- `Education` is a covariate that can be represented as a categorical variable.
+- `Marital_Status` is a categorical variable that can be represented numerically.
+- `NumStorePurchases` is one of the covariates or predictor which represents the number of purchases made in store.
+- `Marital_Status` is a categorical variable which can be represented by numerical
+- `Education` is one of the covariates which can be represented by a categorical variable.
+
+The code belows shows the unique values present in the `Education` and `Marital_Status` column of the `market_data` data frame. 
+
+```{r}
+unique(market_data$Education)  
+unique(market_data$Marital_Status)     # Possible covariates to be used as factor variables for research model, to classify YOLO as single?
+market_data_web <- market_data |>
+    select(MntGoldProds)
+
+head(market_data_web)
+tail(market_data_web)
+
+
+# Extract the unique values and their counts
+education_counts <- table(market_data$Education) 
+education_counts
+
+
+# Extract Unique values of Marital Status
+marital_counts <- table(market_data$Marital_Status)
+marital_counts
+```
+
+### EDA and Visualisation
+
+From the code above, there's seem to be the a huge amount of respondents who possess `2n Cycle` education level. This means that there's a need to include this in the analysis. Since `2n Cycle` is the same as Master's Degree as found in https://www.kaggle.com/datasets/imakash3011/customer-personality-analysis/discussion/466400. The code below shows the wrangling tp include them as `Master`. 
+A correlation plot maybe suitable to check for the relationship between the continuous random variable such as `Income`, `NumCatalogPurchases`, `NumWebVisitsMonth`, `NumStorePurchases`, `NumWebPurchases`.
+
+A correlation plot maybe suitable to check for the relationship between the continuous random variable such as `Income`, `NumCatalogPurchases`, `NumWebVisitsMonth`, `NumStorePurchases`, `NumWebPurchases`. The correlation plot provides a visual summary of the linear relationship betweem the selected variables. This can help me to see which variables I can include in the regression model for analysation which will be done at a later stage. Additionally, the correlation plot serves as an indicator to check if there's perfect multicolinearity between different variables where an extreme high correlation coefficients (close to -1 or +1) may indicate that.
+
+```{r}
+options(repr.plot.width = 10, repr.plot.height = 8)
+# Using correlation plot to check the relationship between the variables
+corr_plt_dat <- market_data[, c("Income", "NumWebPurchases", "NumCatalogPurchases",
+ "NumStorePurchases", "NumWebVisitsMonth", "MntGoldProds", "MntWines", "MntFruits", 
+ "MntMeatProducts", "MntFishProducts", "MntSweetProducts")] |>
+as.data.frame() 
+# Ensure there are no missing values
+corr_plt_dat <- na.omit(corr_plt_dat)
+
+cor_matrix <- cor(corr_plt_dat)
+
+corrplot(cor_matrix, order = "hclust", addrect = 2)
+# corrplot(cor_matrix, method = "number", addrect = 2)  # To display the correlation values
+```
+
+From the correlation plot, there seems to be a strong positve relationship between `NumCatalogPurchases` and `MntMeatProducts`. This suggests that individuals with higher income tend to make purchases through the Catalogue. Additionally, there's seems to be a weaker (moderate) relationship between `Income` and `NumWebVisitsMonth` which suggests there may be other confounding variables that may influence the number of web purchases and `Income`. Conversely, there's seem to be a moderate-strong negative relationship between `MntMeatProducts` and `NumWebVisitsMonth`.
+
+### Data Wrangling
+
+The code below shows the wrangling of the dataset for the different education level and marital status which will be useful for future analysis for the project.
+
+```{r}
+# Recode '2n Cycle' to 'Master' in the Education column using case_when
+market_data <- market_data %>%
+    mutate(Education = case_when(
+        Education == "2n Cycle" ~ "Master",
+        TRUE ~ Education
+    ))
+
+# Verify the changes
+unique(market_data$Education)
+
+# Recode specific values to 'Single' in the Marital_Status column using case_when
+market_data <- market_data %>%
+    mutate(Marital_Status = case_when(
+        Marital_Status %in% c("Absurd", "Alone", "YOLO", "Together") ~ "Single",
+        TRUE ~ Marital_Status
+    ))
+
+# Verify the changes
+unique(market_data$Marital_Status)
+
+# Convert and Parse Dt_Customer to Date format
+market_data$Dt_Customer <- dmy(market_data$Dt_Customer) 
+market_data$Dt_Customer
+```
+
+```{r}
+# Cleaned Data
+head(market_data)
+```
+
